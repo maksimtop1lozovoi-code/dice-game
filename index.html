@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Dice 1000</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #1a1d24;
+    color: #e8eaed;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px;
+    user-select: none;
+  }
+  .screen { width: 100%; max-width: 480px; }
+  .hidden { display: none !important; }
+
+  h1 { font-size: 22px; text-align: center; margin: 8px 0 16px; color: #ffb347; }
+  h2 { font-size: 16px; margin: 8px 0; }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s, transform .05s;
+    color: #fff;
+  }
+  .btn:active:not(:disabled) { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-primary { background: #3b82f6; }
+  .btn-success { background: #22c55e; }
+  .btn-warn { background: #f59e0b; }
+  .btn-secondary { background: #4b5563; }
+
+  .rounds-select {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .rounds-select button {
+    width: 44px; height: 44px;
+    font-size: 22px;
+    border-radius: 50%;
+    border: none;
+    background: #374151;
+    color: #fff;
+    cursor: pointer;
+  }
+  .rounds-select .val { font-size: 28px; font-weight: 700; color: #ffb347; min-width: 50px; text-align: center; }
+
+  .scoreboard {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .player-card {
+    flex: 1;
+    background: #262a33;
+    border-radius: 10px;
+    padding: 10px;
+    border: 2px solid transparent;
+    text-align: center;
+  }
+  .player-card.active { border-color: #ffb347; }
+  .player-card .name { font-size: 12px; color: #9ca3af; }
+  .player-card .score { font-size: 22px; font-weight: 700; }
+  .player-card .round-score { font-size: 13px; color: #22c55e; margin-top: 2px; }
+
+  .info-bar {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #9ca3af;
+    margin-bottom: 8px;
+  }
+
+  .dice-area {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 12px 0;
+    min-height: 220px;
+  }
+  .die {
+    aspect-ratio: 1;
+    background: #f8f8f8;
+    color: #1a1d24;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s;
+    border: 3px solid transparent;
+    position: relative;
+  }
+  .die.placeholder {
+    background: #262a33;
+    color: #4b5563;
+    cursor: default;
+    font-size: 32px;
+  }
+  .die.selected {
+    border-color: #22c55e;
+    background: #d1fae5;
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(34,197,94,0.4);
+  }
+  .die.locked {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .combo-hint {
+    text-align: center;
+    font-size: 13px;
+    min-height: 20px;
+    margin: 4px 0;
+    color: #9ca3af;
+  }
+  .combo-hint.valid { color: #22c55e; font-weight: 600; }
+  .combo-hint.invalid { color: #ef4444; }
+
+  .current-round-score {
+    text-align: center;
+    font-size: 16px;
+    margin: 8px 0;
+    color: #ffb347;
+    font-weight: 600;
+  }
+
+  .bust-banner {
+    background: #ef4444;
+    color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 700;
+    margin: 8px 0;
+  }
+
+  .log {
+    background: #1f232b;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #9ca3af;
+    max-height: 100px;
+    overflow-y: auto;
+    margin-top: 8px;
+  }
+  .log div { padding: 2px 0; }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+  .modal {
+    background: #262a33;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+  }
+  .modal h2 { color: #ffb347; font-size: 20px; margin-bottom: 12px; }
+  .modal p { color: #d1d5db; margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<div class="screen" id="screen-setup">
+  <h1>🎲 Dice 1000</h1>
+  <p style="text-align:center; color:#9ca3af; font-size:14px;">Two-player game. Score 300+ in a round to save your points.</p>
+  <div class="rounds-select">
+    <button onclick="changeRounds(-1)">−</button>
+    <div class="val" id="rounds-val">3</div>
+    <button onclick="changeRounds(1)">+</button>
+  </div>
+  <p style="text-align:center; color:#9ca3af; font-size:13px;">Number of rounds (1–10)</p>
+  <button class="btn btn-primary" onclick="startGame()">Start Game</button>
+</div>
+
+<div class="screen hidden" id="screen-game">
+  <div class="scoreboard">
+    <div class="player-card" id="p1-card">
+      <div class="name">Player 1</div>
+      <div class="score" id="p1-score">0</div>
+      <div class="round-score" id="p1-round"></div>
+    </div>
+    <div class="player-card" id="p2-card">
+      <div class="name">Player 2</div>
+      <div class="score" id="p2-score">0</div>
+      <div class="round-score" id="p2-round"></div>
+    </div>
+  </div>
+
+  <div class="info-bar">
+    <span id="round-info">Round 1 / 3</span>
+    <span id="turn-info">Turn: Player 1</span>
+  </div>
+
+  <div class="dice-area" id="dice-area"></div>
+
+  <div class="combo-hint" id="combo-hint"></div>
+  <div class="current-round-score" id="current-round-score"></div>
+
+  <div id="bust-area"></div>
+
+  <button class="btn btn-warn" id="btn-roll" onclick="rollDice()">Roll Dice</button>
+  <button class="btn btn-success hidden" id="btn-lock" onclick="lockSelection()">Lock Selected</button>
+  <button class="btn btn-success hidden" id="btn-save" onclick="saveAndPass()">Save Points</button>
+  <button class="btn btn-secondary hidden" id="btn-reset-sel" onclick="clearSelection()">Clear Selection</button>
+
+  <div class="log" id="log"></div>
+</div>
+
+<script>
+// ===== GAME STATE =====
+const state = {
+  totalRounds: 3,
+  currentRound: 1,
+  currentPlayer: 0,
+  scores: [0, 0],
+  roundScores: [0, 0],
+  dice: [],
+  locked: [],
+  selected: [],
+  phase: 'roll',           // 'roll' | 'select' | 'bust' | 'gameover'
+  hasRolledThisTurn: false,
+  awaitingReroll: false,   // true when all 6 locked and player must choose
+};
+
+// ===== COMBO EVALUATION =====
+function validateSelection(values) {
+  if (values.length === 0) return null;
+
+  const vals = [...values].sort((a,b)=>a-b);
+  const n = vals.length;
+  const counts = [0,0,0,0,0,0,0];
+  vals.forEach(v => counts[v]++);
+
+  // Straight 1-2-3-4-5-6
+  if (n === 6 && counts[1]===1 && counts[2]===1 && counts[3]===1 && counts[4]===1 && counts[5]===1 && counts[6]===1) {
+    return { score: 1000, name: 'Straight 1-2-3-4-5-6' };
+  }
+
+  // Three pairs (exactly 6 dice, 3 different pairs)
+  if (n === 6) {
+    const pairs = [];
+    let ok = true;
+    for (let v = 1; v <= 6; v++) {
+      if (counts[v] === 2) pairs.push(v);
+      else if (counts[v] !== 0) { ok = false; break; }
+    }
+    if (ok && pairs.length === 3) return { score: 750, name: 'Three Pairs' };
+  }
+
+  // Single 1 or single 5
+  if (n === 1) {
+    if (vals[0] === 1) return { score: 100, name: 'Single 1' };
+    if (vals[0] === 5) return { score: 50, name: 'Single 5' };
+    return null;
+  }
+
+  // All same value (3,4,5,6 of a kind)
+  const allSame = vals.every(v => v === vals[0]);
+  if (allSame) {
+    const v = vals[0];
+    const base = (v === 1) ? 1000 : v * 100;
+    if (n === 3) return { score: base, name: `Three ${v}s` };
+    if (n === 4) return { score: base * 2, name: `Four ${v}s` };
+    if (n === 5) return { score: base * 3, name: `Five ${v}s` };
+    if (n === 6) return { score: base * 4, name: `Six ${v}s` };
+  }
+
+  // Combination of only 1s and 5s (mixed, e.g., 1+5, 1+1+5, etc.)
+  if (vals.every(v => v === 1 || v === 5)) {
+    let score = 0, ones = 0, fives = 0;
+    vals.forEach(v => { if (v === 1) { score += 100; ones++; } else { score += 50; fives++; } });
+    const parts = [];
+    if (ones) parts.push(`${ones}×1`);
+    if (fives) parts.push(`${fives}×5`);
+    return { score, name: parts.join(' + ') };
+  }
+
+  return null;
+}
+
+// Check if there is ANY valid combo among the given dice values (as full available set)
+function hasAnyCombo(values) {
+  if (values.length === 0) return false;
+
+  const counts = [0,0,0,0,0,0,0];
+  values.forEach(v => counts[v]++);
+  const n = values.length;
+
+  // Straight
+  if (n === 6 && counts[1]===1 && counts[2]===1 && counts[3]===1 && counts[4]===1 && counts[5]===1 && counts[6]===1) return true;
+
+  // Three pairs
+  if (n === 6) {
+    let pairs = 0, ok = true;
+    for (let v = 1; v <= 6; v++) {
+      if (counts[v] === 2) pairs++;
+      else if (counts[v] !== 0) { ok = false; break; }
+    }
+    if (ok && pairs === 3) return true;
+  }
+
+  // Any 1 or 5
+  if (counts[1] >= 1 || counts[5] >= 1) return true;
+
+  // Any triple or more
+  for (let v = 2; v <= 6; v++) {
+    if (counts[v] >= 3) return true;
+  }
+
+  return false;
+}
+
+// ===== UI =====
+function changeRounds(delta) {
+  const val = document.getElementById('rounds-val');
+  let n = parseInt(val.textContent) + delta;
+  if (n < 1) n = 1;
+  if (n > 10) n = 10;
+  val.textContent = n;
+}
+
+function startGame() {
+  state.totalRounds = parseInt(document.getElementById('rounds-val').textContent);
+  state.currentRound = 1;
+  state.currentPlayer = Math.random() < 0.5 ? 0 : 1;
+  state.scores = [0, 0];
+  state.roundScores = [0, 0];
+  state.phase = 'roll';
+  state.hasRolledThisTurn = false;
+  state.awaitingReroll = false;
+
+  document.getElementById('screen-setup').classList.add('hidden');
+  document.getElementById('screen-game').classList.remove('hidden');
+
+  log(`Game started! Rounds: ${state.totalRounds}`);
+  log(`First turn: Player ${state.currentPlayer + 1}`);
+
+  newTurn();
+  render();
+}
+
+function newTurn() {
+  state.dice = [null, null, null, null, null, null];
+  state.locked = [false, false, false, false, false, false];
+  state.selected = [false, false, false, false, false, false];
+  state.roundScores[state.currentPlayer] = 0;
+  state.phase = 'roll';
+  state.hasRolledThisTurn = false;
+  state.awaitingReroll = false;
+  render();
+}
+
+function rollDice() {
+  if (state.phase !== 'roll') return;
+
+  // Roll only non-locked dice
+  for (let i = 0; i < 6; i++) {
+    if (!state.locked[i]) {
+      state.dice[i] = 1 + Math.floor(Math.random() * 6);
+    }
+  }
+  state.selected = [false, false, false, false, false, false];
+  state.hasRolledThisTurn = true;
+  state.awaitingReroll = false;
+
+  const values = state.dice.filter(v => v !== null);
+  if (!hasAnyCombo(values)) {
+    bust();
+    return;
+  }
+  state.phase = 'select';
+  render();
+  updateComboHint();
+}
+
+function bust() {
+  state.phase = 'bust';
+  log(`💥 BUST! Player ${state.currentPlayer + 1} loses round points (${state.roundScores[state.currentPlayer]})`);
+  state.roundScores[state.currentPlayer] = 0;
+  render();
+  setTimeout(() => {
+    nextPlayer();
+  }, 1500);
+}
+
+function toggleDie(index) {
+  if (state.phase !== 'select') return;
+  if (state.locked[index]) return;
+  state.selected[index] = !state.selected[index];
+  render();
+  updateComboHint();
+}
+
+function clearSelection() {
+  state.selected = [false, false, false, false, false, false];
+  render();
+  updateComboHint();
+}
+
+function updateComboHint() {
+  const hint = document.getElementById('combo-hint');
+  const indices = [];
+  state.selected.forEach((s, i) => { if (s) indices.push(i); });
+
+  if (indices.length === 0) {
+    hint.textContent = 'Select dice to form a combo';
+    hint.className = 'combo-hint';
+    document.getElementById('btn-lock').classList.add('hidden');
+    return;
+  }
+
+  const values = indices.map(i => state.dice[i]);
+  const result = validateSelection(values);
+
+  if (result) {
+    hint.textContent = `✓ ${result.name} = ${result.score} points`;
+    hint.className = 'combo-hint valid';
+    document.getElementById('btn-lock').classList.remove('hidden');
+    document.getElementById('btn-lock').textContent = `Lock ${result.score} points`;
+  } else {
+    hint.textContent = '✗ Not a valid combo';
+    hint.className = 'combo-hint invalid';
+    document.getElementById('btn-lock').classList.add('hidden');
+  }
+}
+
+function lockSelection() {
+  if (state.phase !== 'select') return;
+  const indices = [];
+  state.selected.forEach((s, i) => { if (s) indices.push(i); });
+  if (indices.length === 0) return;
+
+  const values = indices.map(i => state.dice[i]);
+  const result = validateSelection(values);
+  if (!result) return;
+
+  indices.forEach(i => { state.locked[i] = true; });
+  state.roundScores[state.currentPlayer] += result.score;
+  log(`Player ${state.currentPlayer + 1}: +${result.score} (${result.name})`);
+
+  state.selected = [false, false, false, false, false, false];
+
+  const allLocked = state.locked.every(l => l);
+  if (allLocked) {
+    // All 6 locked — player chooses: reroll all 6 or save
+    state.awaitingReroll = true;
+    state.phase = 'roll';
+    log('All 6 dice locked. Roll again with all 6 or save points.');
+    render();
+    updateComboHint();
+    return;
+  }
+
+  state.phase = 'roll';
+  render();
+  updateComboHint();
+}
+
+function rerollAll() {
+  // Reset dice, locked, selected — keep round score
+  state.dice = [null, null, null, null, null, null];
+  state.locked = [false, false, false, false, false, false];
+  state.selected = [false, false, false, false, false, false];
+  state.awaitingReroll = false;
+  state.phase = 'roll';
+  state.hasRolledThisTurn = false;
+  render();
+}
+
+function saveAndPass() {
+  const total = state.roundScores[state.currentPlayer];
+  if (total < 300) {
+    alert('Need at least 300 points to save!');
+    return;
+  }
+  state.scores[state.currentPlayer] += total;
+  log(`✅ Player ${state.currentPlayer + 1} saves ${total} points. Total: ${state.scores[state.currentPlayer]}`);
+  state.roundScores[state.currentPlayer] = 0;
+  nextPlayer();
+}
+
+function nextPlayer() {
+  if (state.currentPlayer === 1) {
+    state.currentRound++;
+    if (state.currentRound > state.totalRounds) {
+      endGame();
+      return;
+    }
+    log(`--- Round ${state.currentRound} ---`);
+  }
+  state.currentPlayer = 1 - state.currentPlayer;
+  newTurn();
+  render();
+}
+
+function endGame() {
+  state.phase = 'gameover';
+  const s1 = state.scores[0];
+  const s2 = state.scores[1];
+  let winner;
+  if (s1 > s2) winner = 'Player 1 wins!';
+  else if (s2 > s1) winner = 'Player 2 wins!';
+  else winner = 'Draw!';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>🏆 Game Over</h2>
+      <p>Player 1: <b>${s1}</b></p>
+      <p>Player 2: <b>${s2}</b></p>
+      <p style="font-size:18px; color:#ffb347; margin-top:16px;"><b>${winner}</b></p>
+      <button class="btn btn-primary" style="margin-top:16px;" onclick="location.reload()">New Game</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+// ===== RENDER =====
+function render() {
+  document.getElementById('p1-score').textContent = state.scores[0];
+  document.getElementById('p2-score').textContent = state.scores[1];
+  document.getElementById('p1-round').textContent = state.currentPlayer === 0 ? `+${state.roundScores[0]}` : '';
+  document.getElementById('p2-round').textContent = state.currentPlayer === 1 ? `+${state.roundScores[1]}` : '';
+
+  document.getElementById('p1-card').classList.toggle('active', state.currentPlayer === 0);
+  document.getElementById('p2-card').classList.toggle('active', state.currentPlayer === 1);
+
+  document.getElementById('round-info').textContent = `Round ${state.currentRound} / ${state.totalRounds}`;
+  document.getElementById('turn-info').textContent = `Turn: Player ${state.currentPlayer + 1}`;
+
+  // Dice
+  const area = document.getElementById('dice-area');
+  area.innerHTML = '';
+  for (let i = 0; i < 6; i++) {
+    const div = document.createElement('div');
+    div.className = 'die';
+    if (state.dice[i] === null) {
+      div.classList.add('placeholder');
+      div.textContent = '?';
+    } else {
+      div.textContent = state.dice[i];
+      if (state.locked[i]) div.classList.add('locked');
+      if (state.selected[i]) div.classList.add('selected');
+      div.onclick = () => toggleDie(i);
+    }
+    area.appendChild(div);
+  }
+
+  const btnRoll = document.getElementById('btn-roll');
+  const btnLock = document.getElementById('btn-lock');
+  const btnSave = document.getElementById('btn-save');
+  const btnReset = document.getElementById('btn-reset-sel');
+
+  btnRoll.classList.add('hidden');
+  btnLock.classList.add('hidden');
+  btnSave.classList.add('hidden');
+  btnReset.classList.add('hidden');
+
+  const total = state.roundScores[state.currentPlayer];
+
+  if (state.phase === 'select') {
+    // In selection mode — Lock button shown if valid selection, plus Reset
+    if (state.selected.some(s => s)) btnReset.classList.remove('hidden');
+    // btnLock visibility handled in updateComboHint
+    updateComboHint();
+  } else if (state.phase === 'roll') {
+    if (state.awaitingReroll) {
+      // All 6 locked — offer reroll or save
+      btnRoll.classList.remove('hidden');
+      btnRoll.textContent = 'Roll All 6 Again';
+      btnRoll.onclick = rerollAll;
+      if (total >= 300) {
+        btnSave.classList.remove('hidden');
+        btnSave.textContent = `Save ${total} Points`;
+      }
+    } else {
+      // Normal roll phase
+      btnRoll.classList.remove('hidden');
+      btnRoll.textContent = state.hasRolledThisTurn ? 'Roll Remaining Dice' : 'Roll Dice';
+      btnRoll.onclick = rollDice;
+      // If player has already rolled and has >= 300, allow save
+      if (state.hasRolledThisTurn && total >= 300) {
+        btnSave.classList.remove('hidden');
+        btnSave.textContent = `Save ${total} Points`;
+      }
+    }
+  }
+
+  document.getElementById('current-round-score').textContent =
+    total > 0 ? `Round score: ${total}` : '';
+
+  const bustArea = document.getElementById('bust-area');
+  if (state.phase === 'bust') {
+    bustArea.innerHTML = '<div class="bust-banner">💥 BUST! Round points lost</div>';
+  } else {
+    bustArea.innerHTML = '';
+  }
+}
+
+function log(msg) {
+  const el = document.getElementById('log');
+  const div = document.createElement('div');
+  div.textContent = msg;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+</script>
+</body>
+</html>
